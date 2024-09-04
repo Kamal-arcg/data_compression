@@ -1,0 +1,167 @@
+import pandas as pd
+from mlxtend.preprocessing import TransactionEncoder
+from mlxtend.frequent_patterns import apriori
+import random
+
+def load_data(filename):
+  """Loads the dataset from a text file into a list of lists.
+
+  Args:
+    filename: The name of the text file containing the dataset.
+
+  Returns:
+    A list of lists, where each inner list represents a transaction.
+  """
+
+  data = []
+  with open(filename, 'r') as file:
+    for line in file:
+      transaction = line.strip().split(' ')
+      data.append(transaction)
+  return data
+
+def find_frequent_itemsets(data, min_support):
+  """Finds frequent itemsets in the dataset.
+
+  Args:
+    data: The dataset as a list of lists.
+    min_support: The minimum support for an itemset to be considered frequent.
+
+  Returns:
+    A list of frequent itemsets.
+  """
+
+  te = TransactionEncoder()
+  te_data = te.fit(data).transform(data)
+  df = pd.DataFrame(te_data, columns=te.columns_)
+
+  frequent_itemsets = apriori(df, min_support=min_support, use_colnames=True)
+  return frequent_itemsets
+
+def create_mapping(freq_itemsets):
+  """Creates a mapping from frequent itemsets to codes.
+
+  Args:
+    freq_itemsets: A list of frequent itemsets.
+
+  Returns:
+    A dictionary mapping frequent itemsets to codes.
+  """
+
+  mapping = {}
+  code = 0
+  for itemset in freq_itemsets:
+    mapping[itemset] = code
+    code += 1
+  return mapping
+
+def compress_dataset(data, mapping):
+  """Compresses the dataset using the given mapping.
+
+  Args:
+    data: The dataset as a list of lists.
+    mapping: A dictionary mapping frequent itemsets to codes.
+
+  Returns:
+    The compressed dataset as a list of lists.
+  """
+
+  compressed_data = []
+  for transaction in data:
+    compressed_transaction = []
+    for item in transaction:
+      for itemset, code in mapping.items():
+        if item in itemset:
+          compressed_transaction.append(code)
+          break
+      else:
+        compressed_transaction.append(item)
+    compressed_data.append(compressed_transaction)
+  return compressed_data
+
+def decompress_dataset(compressed_data, mapping):
+  """Decompresses the dataset using the given mapping.
+
+  Args:
+    compressed_data: The compressed dataset as a list of lists.
+    mapping: A dictionary mapping codes to frequent itemsets.
+
+  Returns:
+    The decompressed dataset as a list of lists.
+  """
+
+  decompressed_data = []
+  for compressed_transaction in compressed_data:
+    decompressed_transaction = []
+    for item in compressed_transaction:
+      if isinstance(item, int):
+        itemset = list(mapping[item])
+        decompressed_transaction.extend(itemset)
+      else:
+        decompressed_transaction.append(item)
+    decompressed_data.append(decompressed_transaction)
+  return decompressed_data
+
+def calculate_compression_ratio(original_data, compressed_data, mapping):
+  """Calculates the compression ratio.
+
+  Args:
+    original_data: The original dataset as a list of lists.
+    compressed_data: The compressed dataset as a list of lists.
+    mapping: The mapping dictionary.
+
+  Returns:
+    The compression ratio.
+  """
+
+  original_size = sum(len(transaction) for transaction in original_data)
+  compressed_size = sum(len(transaction) for transaction in compressed_data) + len(mapping)
+  compression_ratio = original_size / compressed_size
+  return compression_ratio
+
+def generate_stimulated_dataset(num_transactions, num_items, min_items_per_transaction, max_items_per_transaction):
+  """Generates a simulated transactional dataset.
+
+  Args:
+    num_transactions: The number of transactions to generate.
+    num_items: The total number of unique items.
+    min_items_per_transaction: The minimum number of items per transaction.
+    max_items_per_transaction: The maximum number of items per transaction.
+
+  Returns:
+    A list of lists representing the transactions.
+  """
+
+  dataset = []
+  items = [f'Item_{i}' for i in range(num_items)]
+  for _ in range(num_transactions):
+    transaction = []
+    for _ in range(random.randint(min_items_per_transaction, max_items_per_transaction)):
+      transaction.append(random.choice(items))
+    dataset.append(transaction)
+  return dataset
+
+# Generate a simulated dataset
+num_transactions = 1000000
+num_items = 1000
+min_items_per_transaction = 1
+max_items_per_transaction = 10
+simulated_dataset = generate_stimulated_dataset(num_transactions, num_items, min_items_per_transaction, max_items_per_transaction)
+
+# Find frequent itemsets
+min_support = 0.01  # Adjust as needed
+frequent_itemsets = find_frequent_itemsets(simulated_dataset, min_support)
+
+# Create mapping
+mapping = create_mapping(frequent_itemsets)
+
+# Compress the dataset
+compressed_data = compress_dataset(simulated_dataset, mapping)
+
+# Decompress the dataset
+decompressed_data = decompress_dataset(compressed_data, mapping)
+
+# Calculate compression ratio
+compression_ratio = calculate_compression_ratio(simulated_dataset, compressed_data, mapping)
+
+print("Compression ratio:", compression_ratio)
